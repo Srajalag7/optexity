@@ -273,6 +273,16 @@ Releases are automated via GitHub Actions:
 
 ## Examples
 
+### Action memory (opt-in)
+
+Add `"learning": {"mode": "auto"}` to an automation's `agentic_task` to record
+executed actions and reuse verified steps with new input values. Complete cache
+hits run without LLM calls; uncertain steps remain agentic. Existing workflows
+keep their normal behavior when learning is omitted.
+
+See [Action memory](actionmemory.md) for implementation details, measured RoboForm
+and multi-page download results, configuration, and end-to-end curl instructions.
+
 Check out our examples directory for sample automations:
 
 - [I94 extraction](https://docs.optexity.com/examples/data_extraction/i94)
