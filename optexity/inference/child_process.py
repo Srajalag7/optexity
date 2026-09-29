@@ -544,7 +544,24 @@ async def task_processor():
                 continue
 
             automation_error: str | None = None
-            if task.endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
+            if settings.DEPLOYMENT == "dev" and os.environ.get(
+                "OPTEXITY_LOCAL_AUTOMATION_PATH"
+            ):
+                from optexity.schema.automation import Automation
+
+                try:
+                    task.automation = Automation.model_validate_json(
+                        pathlib.Path(
+                            os.environ["OPTEXITY_LOCAL_AUTOMATION_PATH"]
+                        ).read_text()
+                    )
+                    fetch_success = True
+                except (OSError, ValueError) as override_error:
+                    fetch_success = False
+                    automation_error = (
+                        f"Invalid local automation: {type(override_error).__name__}"
+                    )
+            elif task.endpoint_name.startswith(MARKETPLACE_ENDPOINT_PREFIX):
                 # Marketplace automations are plain .py modules shipped in
                 # optexity_private (worker image only) — built directly instead
                 # of fetching a recording-backed automation from opcloud.

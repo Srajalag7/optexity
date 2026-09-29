@@ -62,6 +62,10 @@ async def run_interaction_action(
     browser: Browser,
     retries_left: int,
 ):
+    if interaction_action.deterministic_only:
+        from optexity.inference.core.interaction.action_memory import replay_action
+
+        return await replay_action(interaction_action, task, memory, browser)
     if retries_left <= 0:
         return
 

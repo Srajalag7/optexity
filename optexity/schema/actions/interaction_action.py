@@ -3,7 +3,7 @@ from enum import Enum, unique
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from optexity.schema.actions.keyboard_keys import KEY_NAMES
 from optexity.schema.actions.prompts import overlay_popup_prompt
@@ -358,14 +358,37 @@ class KeyPressAction(BaseAction):
         return self
 
 
+class LearningConfig(BaseModel):
+    mode: Literal["off", "record", "auto", "replay_only"] = "off"
+
+
+class ReplayGuard(BaseModel):
+    """Evidence attached only to generated deterministic actions."""
+
+    source_event: str
+    before_url: str
+    after_url: str
+    value: str | None = None
+    download_sha256: str | None = None
+
+
 class AgenticTask(BaseModel):
     task: str
     max_steps: int
     backend: Literal["browser_use", "browserbase"] = "browser_use"
     use_vision: bool = False
     keep_alive: bool = True
+    learning: LearningConfig | None = None
+    _task_template: str | None = PrivateAttr(default=None)
+    _bindings: dict[str, str] = PrivateAttr(default_factory=dict)
 
     def replace(self, pattern: str, replacement: str):
+        if self.learning and self.learning.mode != "off":
+            if self._task_template is None:
+                self._task_template = self.task
+            if pattern in self._task_template:
+                self._bindings[pattern] = replacement
+            return self
         if self.task:
             self.task = self.task.replace(pattern, replacement).strip('"')
         return self
@@ -380,6 +403,8 @@ class CloseOverlayPopupAction(AgenticTask):
 
 
 class InteractionAction(BaseModel):
+    deterministic_only: bool = False
+    replay_guard: ReplayGuard | None = None
     max_tries: int = 10
     max_timeout_seconds_per_try: float = 1.0
     verify_before_step: bool = True
@@ -442,6 +467,8 @@ class InteractionAction(BaseModel):
         return self
 
     def replace(self, pattern: str, replacement: str):
+        if self.replay_guard and self.replay_guard.value is not None:
+            self.replay_guard.value = self.replay_guard.value.replace(pattern, replacement)
         if self.click_element:
             self.click_element.replace(pattern, replacement)
         if self.input_text:
